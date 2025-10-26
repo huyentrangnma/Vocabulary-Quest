@@ -6,34 +6,73 @@
     <title>Vocabulary Quest - Select Unit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Toàn bộ CSS của bạn được giữ nguyên... */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        /* Set background to dark grey */
         body { font-family: 'Inter', sans-serif; background-color: #282c34; color: #e6edf3; }
         .card { background-color: #3e4451; border: 1px solid #5a606d; }
         .shadow-gold { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
-        .unit-button { transition: all 0.3s ease; transform: translateY(0); }
-        .unit-button:hover { box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4); transform: translateY(-2px); background-color: #a04f00 !important; }
-        .loading-animation { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #FFD700; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .correct-answer { animation: flash-correct 0.5s ease-out; }
-        .dimmed { opacity: 0.4; pointer-events: none; transition: opacity 0.3s; }
-        @keyframes flash-correct { 0% { background-color: #3e4451; transform: scale(1); } 50% { background-color: #16a34a; transform: scale(1.05); } 100% { background-color: #3e4451; transform: scale(1); } }
-        .jumble-hint { font-family: 'Courier New', monospace; letter-spacing: 4px; font-size: 2rem; color: #FFD700; text-shadow: 0 0 5px #ffcc00; }
+        .unit-button {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        .unit-button:hover {
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+            transform: translateY(-2px);
+            background-color: #a04f00 !important; /* Slightly darker gold on hover */
+        }
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #FFD700;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .correct-answer {
+            animation: flash-correct 0.5s ease-out;
+        }
+        .dimmed {
+            opacity: 0.4;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        @keyframes flash-correct {
+            0% { background-color: #3e4451; transform: scale(1); }
+            50% { background-color: #16a34a; transform: scale(1.05); }
+            100% { background-color: #3e4451; transform: scale(1); }
+        }
+        .jumble-hint {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 4px;
+            font-size: 2rem;
+            color: #FFD700;
+            text-shadow: 0 0 5px #ffcc00;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
+    <!-- Firebase SDKs (Auth only) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set log level for development
         setLogLevel('Debug');
+
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
         if (Object.keys(firebaseConfig).length > 0) {
             window.firebaseApp = initializeApp(firebaseConfig);
             window.db = getFirestore(window.firebaseApp);
             window.auth = getAuth(window.firebaseApp);
+
             async function authenticate() {
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -58,29 +97,135 @@
         }
     </script>
     
+    <!-- Main Game Container -->
     <div id="game-container" class="w-full max-w-4xl card p-6 rounded-xl shadow-gold text-white">
         <h1 class="text-3xl font-black text-center text-yellow-400 mb-6 uppercase tracking-wider">
             🗺️ ENGLISH VOCABULARY QUEST (UNITS 1-10)
         </h1>
+
+        <!-- User/Status Info -->
         <div class="flex justify-between items-center mb-4 text-sm font-semibold text-gray-400">
             <span id="user-id-display" class="bg-gray-700 p-2 rounded-lg truncate w-full"> 
                 Explorer: Anonymous
             </span>
         </div>
+
+        <!-- Progress Bar & Stage Display -->
         <div class="mb-6">
             <div id="progress-bar-container" class="w-full bg-gray-700 rounded-full h-4 mb-2">
                 <div id="progress-bar" class="bg-yellow-500 h-4 rounded-full transition-all duration-500" style="width: 0%;"></div>
             </div>
             <p id="stage-display" class="text-center text-yellow-400 font-bold">Station 0 / 10: Getting Ready</p>
         </div>
+
+        <!-- Start/Selection Screen -->
         <div id="start-screen" class="text-center">
+            <img src="https://placehold.co/800x200/5a606d/ffffff?text=SELECT+YOUR+UNIT" alt="Textbook Map" class="w-full h-32 object-cover rounded-lg mb-6 opacity-80" />
+            
+            <div id="start-content">
+                <p class="text-lg mb-6 text-gray-300">
+                    Select a Unit (1-10) to start your quest! The AI will generate 10 random questions based on the vocabulary and grammar of that lesson. (Max Score: 100 points)
+                </p>
+    
+                <!-- Name Input Field -->
+                <div class="mb-8">
+                    <label for="student-name" class="text-lg text-yellow-300 font-semibold block mb-2">Enter Your Name (Optional):</label>
+                    <input type="text" id="student-name" placeholder="Explorer's Name" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-yellow-500 focus:border-yellow-500 text-center text-lg" maxlength="25">
+                </div>
+
+                <!-- Unit Selection Grid -->
+                <div id="unit-selection-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(1)">Unit 1</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(2)">Unit 2</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(3)">Unit 3</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(4)">Unit 4</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(5)">Unit 5</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(6)">Unit 6</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(7)">Unit 7</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(8)">Unit 8</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(9)">Unit 9</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(10)">Unit 10</button>
+                </div>
             </div>
+
+            <!-- Loading State -->
+            <div id="generation-loading" class="hidden flex flex-col items-center justify-center p-10">
+                <div class="loading-animation mb-4 w-12 h-12"></div>
+                <p class="text-xl font-semibold text-yellow-400">AI is generating your unique quest...</p>
+                <p class="text-sm text-gray-400 mt-2">This may take 10-15 seconds. Please wait!</p>
+            </div>
+        </div>
+
+        <!-- Game Question Area -->
         <div id="question-area" class="hidden">
+            <!-- Image Clue Area -->
+            <div id="image-clue-container" class="flex justify-center items-center h-48 w-full card rounded-lg mb-6 p-4">
+                <div id="image-loading" class="hidden flex flex-col items-center">
+                    <div class="loading-animation mb-2"></div>
+                    <p class="text-yellow-400 font-semibold">Drawing Hint...</p>
+                </div>
+                <img id="image-clue" src="" alt="AI Hint Image" class="w-full h-full object-contain rounded-lg hidden border-2 border-yellow-500" />
             </div>
+
+            <!-- Audio Clue Area -->
+            <div id="audio-clue-container" class="hidden flex flex-col items-center justify-center card rounded-lg mb-6 p-4">
+                <p id="audio-prompt-text" class="text-center text-xl font-medium mb-4 text-yellow-300">Listen to the English sentence:</p>
+                <div id="audio-controls" class="flex items-center space-x-4">
+                    <button id="play-audio-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition duration-300 disabled:opacity-50 flex items-center" onclick="playAudio()">
+                        <svg id="play-icon" class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.152A1 1 0 008 8v4a1 1 0 001.555.848l3.667-2A1 1 0 0013 10a1 1 0 00-.778-.848l-3.667-2z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+                        <div id="audio-loading-spinner" class="loading-animation w-6 h-6 mr-2 hidden"></div>
+                        <span>Play Audio</span>
+                    </button>
+                    <audio id="audio-player" class="hidden"></audio>
+                </div>
+            </div>
+
+            <!-- Question/Prompt -->
+            <h2 id="question-prompt" class="text-xl font-bold text-center mb-4 text-yellow-300"></h2>
+            
+            <!-- Jumble Hint Display -->
+            <div id="jumble-hint-display" class="hidden text-center mb-6">
+                <p class="text-lg text-gray-400 mb-2">Jumble Hint:</p>
+                <p id="jumble-text" class="jumble-hint"></p>
+            </div>
+
+            <!-- Answer Area (Multiple Choice) -->
+            <div id="answer-options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Buttons will be inserted here -->
+            </div>
+
+            <!-- Spelling Input Area -->
+            <div id="spelling-input-container" class="hidden flex flex-col items-center">
+                <input type="text" id="spelling-input" placeholder="Type your English answer here..." class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-yellow-500 focus:border-yellow-500 text-center text-lg" />
+                
+                <div class="flex space-x-4 mt-4 w-full justify-center">
+                    <button id="submit-spelling" class="flex-1 bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 px-8 rounded-lg transition duration-300 text-lg uppercase" onclick="checkSpelling()">
+                        CONFIRM ANSWER
+                    </button>
+                    <!-- SKIP BUTTON -->
+                    <button id="skip-stage-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-lg transition duration-300 text-lg uppercase" onclick="skipStage()">
+                        SKIP STATION
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Message -->
+            <p id="feedback-message" class="text-center mt-4 text-lg font-semibold h-6"></p>
+        </div>
+
+        <!-- End Screen -->
         <div id="end-screen" class="hidden text-center">
-            </div>
+            <h2 id="end-title" class="text-4xl font-black mb-4 text-green-400 uppercase"></h2>
+            <p id="end-message" class="text-xl mb-6 text-gray-300"></p>
+            <p class="text-2xl font-bold text-yellow-300 mb-8">Total Score: <span id="final-score" class="text-4xl text-yellow-400">0</span> / 100</p>
+            <button class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 px-8 rounded-lg shadow-lg transition duration-300 text-xl uppercase tracking-wider" onclick="window.location.reload()">
+                PLAY AGAIN
+            </button>
+        </div>
+
     </div>
 
+    <!-- ===== PHẦN JAVASCRIPT ĐÃ ĐƯỢC SỬA LẠI (BẢO MẬT) ===== -->
     <script>
         // --- GLOBAL VARIABLES & DATA ---
         let currentUnit = 0;
@@ -94,11 +239,13 @@
         const POINTS_PER_STAGE = 10;
 
         // === ĐÃ SỬA ===
-        // Xóa `apiKey` và `GEMINI_API_URL`
+        // API Key đã bị XÓA khỏi đây.
         // Thêm đường dẫn đến backend an toàn
-        const SECURE_API_ENDPOINT = '/api/handle-game';
+        // SỬA LỖI: Dùng window.location.origin để tạo URL tuyệt đối,
+        //      việc này sửa lỗi "Failed to parse URL" khi chạy trong iframe (như Canvas)
+        const SECURE_API_ENDPOINT = window.location.origin + '/api/handle-game';
         
-        // --- UNIT CONSTRAINTS & THEMES (Giữ nguyên) ---
+        // --- UNIT CONSTRAINTS & THEMES (Giữ nguyên code gốc của bạn) ---
         function getUnitConstraints(unit) {
             let theme = '';
             let grammarExample = '';
@@ -174,18 +321,20 @@
 
             const userQuery = `Generate 10 unique quiz stations about ${theme} based ONLY on Unit ${unit} content, ensuring a variety of question types are represented and the last one is a free response question: '${freeResponseQuestion}'. The total score is 100 points.`;
             
+            // Instruction for the free response input box
             const freeResponsePlaceholder = `Answer in English, using the structure: ${freeResponseStructure.replace('e.g.,', 'E.g.:').replace('[thing] is [preposition] the [other thing].', '[thing] is [preposition] the [other thing].')}`;
 
             return { systemPrompt, userQuery, freeResponsePlaceholder };
         }
         
-        // --- FIREBASE / UTILITY FUNCTIONS (Giữ nguyên) ---
+
+        // --- FIREBASE / UTILITY FUNCTIONS (Giữ nguyên code gốc của bạn) ---
         async function fetchWithRetry(url, options, maxRetries = 5) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(url, options);
                     if (!response.ok) {
-                        const errorText = await response.text();
+                        const errorText = await response.text(); // Lấy thêm chi tiết lỗi
                         console.error(`HTTP Error! status: ${response.status}`, errorText);
                         throw new Error(`HTTP Error! status: ${response.status}`);
                     }
@@ -199,7 +348,7 @@
             }
         }
         
-        // TTS Utility functions (Giữ nguyên)
+        // TTS Utility functions (Giữ nguyên code gốc của bạn)
         function base64ToArrayBuffer(base64) {
             const binaryString = atob(base64);
             const len = binaryString.length;
@@ -240,6 +389,7 @@
         }
         
         // === HÀM ĐÃ SỬA ===
+        // Image generation function (Đã sửa để gọi backend an toàn)
         async function generateImage(prompt) {
             const container = document.getElementById('image-clue-container');
             const imageEl = document.getElementById('image-clue');
@@ -252,13 +402,13 @@
 
             const fullPrompt = `a whimsical, mysterious, stylized drawing of a ${prompt} for a kids' vocabulary quest game. High quality, friendly cartoon style.`;
             
-            // Payload này cho Google
+            // Payload cho Google
             const geminiPayload = {
                 contents: [{ parts: [{ text: fullPrompt }] }],
                 generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
             };
 
-            // Payload này cho backend /api/handle-game của CHÚNG TA
+            // Payload cho backend /api/handle-game của CHÚNG TA
             const backendPayload = {
                 type: 'generate-image',
                 payload: geminiPayload
@@ -296,6 +446,7 @@
         }
         
         // === HÀM ĐÃ SỬA ===
+        // Audio generation function (Đã sửa để gọi backend an toàn)
         async function generateAudio(prompt, voiceName) {
             const btn = document.getElementById('play-audio-btn');
             const spinner = document.getElementById('audio-loading-spinner');
@@ -315,7 +466,7 @@
                     responseModalities: ["AUDIO"],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName || "Kore" } } } 
                 },
-                model: "gemini-1.5-flash-preview-tts" // Cần model name ở đây
+                model: "gemini-2.5-flash-preview-tts" // Model name này sẽ được backend sử dụng
             };
 
             // Payload cho backend của chúng ta
@@ -338,7 +489,7 @@
 
                 if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
                     const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-                    // SỬA LỖI: `sampleTateMatch` (sai) -> `sampleRateMatch` (đúng)
+                    // SỬA LỖI: Sửa `sampleTateMatch` (sai) -> `sampleRateMatch` (đúng)
                     const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000;
                     
                     const pcmData = base64ToArrayBuffer(audioData);
@@ -392,6 +543,7 @@
         };
 
         // === HÀM ĐÃ SỬA ===
+        // (Đã sửa để gọi backend an toàn)
         async function generateNewGameData(unit) {
             const loadingEl = document.getElementById('generation-loading');
             const startContentEl = document.getElementById('start-content');
@@ -429,11 +581,13 @@
                     body: JSON.stringify(backendPayload)
                 });
                 
-                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!jsonText) throw new Error("API response content is empty."); 
-
-                const generatedData = JSON.parse(jsonText);
+                // CẬP NHẬT: Model 1.5-flash trả về JSON trực tiếp, không có .text
+                if (!response.candidates || !response.candidates[0].content) {
+                     throw new Error("API response content is empty."); 
+                }
                 
+                const generatedData = response.candidates[0].content.parts[0].json;
+
                 if (Array.isArray(generatedData) && generatedData.length === TOTAL_STAGES) {
                     gameData = generatedData;
                     console.log(`Successfully generated game data for Unit ${unit}:`, gameData); 
@@ -444,7 +598,8 @@
 
             } catch (error) {
                 console.error("Quiz Generation Failed:", error); 
-                alert(`Quiz Generation for Unit ${unit} failed. Please try again.`); 
+                // Hiển thị lỗi cụ thể hơn cho người dùng
+                alert(`Quiz Generation for Unit ${unit} failed. The AI might be busy or the request is invalid. Please try again. Error: ${error.message}`); 
                 return false;
             } finally {
                 loadingEl.classList.add('hidden');
@@ -453,6 +608,7 @@
         }
         
         // === HÀM ĐÃ SỬA ===
+        // (Đã sửa để gọi backend an toàn)
         async function checkAndCorrectGrammar(userAnswer) {
             const constraints = getUnitConstraints(currentUnit);
             const requiredStructure = constraints.freeResponseStructure;
@@ -491,48 +647,77 @@
             }
         }
 
-        // --- GAME LOGIC (Toàn bộ giữ nguyên) ---
+
+        // --- GAME LOGIC (Giữ nguyên code gốc của bạn) ---
         
         function selectUnit(unit) {
             if (isProcessing) return;
             currentUnit = unit;
+            // Highlight the selected button
             document.querySelectorAll('.unit-button').forEach(btn => {
                 btn.classList.remove('bg-blue-600', 'shadow-gold');
                 if (parseInt(btn.textContent.replace('Unit ', '')) === unit) {
                     btn.classList.add('bg-blue-600', 'shadow-gold');
                 }
             });
+
+            // Update player name and start generation process
             const nameInput = document.getElementById('student-name').value.trim();
             studentName = nameInput || "Anonymous";
+
+            // Get the free response structure guide
             const constraints = getUnitConstraints(unit);
             freeResponseGuide = constraints.freeResponsePlaceholder;
+
             startGame(unit);
         }
+
 
         function updateProgress() {
             const actualTotalStages = gameData.length || TOTAL_STAGES;
             const percent = (currentStage / actualTotalStages) * 100;
             document.getElementById('progress-bar').style.width = `${percent}%`;
+            
             let stageName = 'Vocabulary Challenge'; 
-            if (currentStage === actualTotalStages) { stageName = 'Treasure Chest!'; } 
-            else if (currentStage > actualTotalStages) { stageName = 'Completed'; } 
-            else if (currentStage === 0) { stageName = 'Getting Ready'; }
+            if (currentStage === actualTotalStages) {
+                 stageName = 'Treasure Chest!'; 
+            } else if (currentStage > actualTotalStages) {
+                stageName = 'Completed'; 
+            } else if (currentStage === 0) {
+                 stageName = 'Getting Ready'; 
+            }
             document.getElementById('stage-display').textContent = `Station ${currentStage} / ${actualTotalStages}: ${stageName}`; 
-            document.querySelector('#end-screen .mb-8').innerHTML = `Total Score: <span id="final-score" class="text-4xl text-yellow-400">0</span> / ${actualTotalStages * POINTS_PER_STAGE}`; 
+            
+            // Sửa lỗi: Đảm bảo phần tử tồn tại trước khi cập nhật
+            const scoreDisplay = document.querySelector('#end-screen .mb-8');
+            if (scoreDisplay) {
+                scoreDisplay.innerHTML = `Total Score: <span id="final-score" class="text-4xl text-yellow-400">0</span> / ${actualTotalStages * POINTS_PER_STAGE}`; 
+            }
         }
 
         async function startGame(unit) {
             if (isProcessing) return;
             isProcessing = true;
+
             document.getElementById('user-id-display').textContent = `Explorer: ${studentName} (Unit ${unit})`; 
+
+            // Start game data generation
             const success = await generateNewGameData(unit);
-            if (!success) { isProcessing = false; return; }
+            if (!success) {
+                isProcessing = false;
+                return; // Stop if data generation failed
+            }
+
             currentStage = 0;
             score = 0;
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('end-screen').classList.add('hidden');
             document.getElementById('question-area').classList.remove('hidden');
-            document.getElementById('final-score').textContent = score;
+            
+            // Sửa lỗi: Đảm bảo phần tử tồn tại
+            const finalScoreEl = document.getElementById('final-score');
+            if(finalScoreEl) finalScoreEl.textContent = score;
+
             isProcessing = false;
             nextStage();
         }
@@ -540,12 +725,21 @@
         function nextStage() {
             currentStage++;
             updateProgress();
+            
             document.getElementById('feedback-message').textContent = '';
             document.getElementById('spelling-input').value = '';
             document.getElementById('feedback-message').classList.remove('text-red-500', 'text-green-500');
+
+
             const actualTotalStages = gameData.length;
-            if (currentStage > actualTotalStages) { endGame(); return; }
+            if (currentStage > actualTotalStages) {
+                endGame();
+                return;
+            }
+
             const stageData = gameData[currentStage - 1];
+            
+            // Hide all clue/input areas before showing the new one
             document.getElementById('image-clue-container').classList.add('hidden');
             document.getElementById('image-clue').classList.add('hidden');
             document.getElementById('image-loading').classList.add('hidden');
@@ -553,26 +747,38 @@
             document.getElementById('jumble-hint-display').classList.add('hidden');
             document.getElementById('answer-options-container').classList.add('hidden');
             document.getElementById('spelling-input-container').classList.add('hidden');
+
             document.getElementById('question-prompt').textContent = stageData.questionText;
-            if (stageData.type.includes('_mc')) { renderMultipleChoice(stageData); } 
-            else if (stageData.type === 'jumble_spelling' || stageData.type === 'free_response') { renderSpelling(stageData); }
-            if (stageData.type === 'image_mc' || stageData.type === 'free_response') {
+
+            if (stageData.type.includes('_mc')) {
+                renderMultipleChoice(stageData);
+            } else if (stageData.type === 'jumble_spelling' || stageData.type === 'free_response') {
+                renderSpelling(stageData);
+            }
+            
+            // Display necessary clues (Image/Audio)
+            if (stageData.type === 'image_mc' || (stageData.type === 'free_response' && stageData.prompt)) {
                 document.getElementById('image-clue-container').classList.remove('hidden');
                 isProcessing = true;
                 generateImage(stageData.prompt);
-            } else if (stageData.type === 'audio_mc') {
+            } else if (stageData.type === 'audio_mc' && stageData.audioPrompt) {
                 document.getElementById('audio-clue-container').classList.remove('hidden');
                 isProcessing = true;
-                generateAudio(stageData.audioPrompt, "Kore");
+                generateAudio(stageData.audioPrompt, "Kore"); // Default voice Kore
             }
         }
 
+        // --- MULTIPLE CHOICE LOGIC (Giữ nguyên code gốc của bạn) ---
         function renderMultipleChoice(stageData) {
             const optionsContainer = document.getElementById('answer-options-container');
             optionsContainer.classList.remove('hidden');
             optionsContainer.innerHTML = '';
+
+            // Ensure buttons are re-enabled
             document.querySelectorAll('#answer-options-container button').forEach(btn => btn.disabled = false);
+
             const shuffledOptions = [...stageData.options].sort(() => Math.random() - 0.5);
+
             shuffledOptions.forEach(option => {
                 const button = document.createElement('button');
                 button.textContent = option;
@@ -585,33 +791,47 @@
         function checkAnswer(selectedOption, correctAnswer, button) {
             if (isProcessing) return;
             isProcessing = true;
+            
             const feedbackEl = document.getElementById('feedback-message');
             document.querySelectorAll('#answer-options-container button').forEach(btn => btn.disabled = true);
+
             if (selectedOption === correctAnswer) {
                 score += POINTS_PER_STAGE;
-                document.getElementById('final-score').textContent = score;
+                if(document.getElementById('final-score')) document.getElementById('final-score').textContent = score;
+                
                 button.classList.remove('bg-gray-700', 'hover:bg-gray-600');
                 button.classList.add('correct-answer', 'bg-green-700');
                 feedbackEl.classList.remove('text-red-500');
                 feedbackEl.classList.add('text-green-500');
                 feedbackEl.textContent = `CORRECT! +${POINTS_PER_STAGE} points!`; 
-                setTimeout(() => { isProcessing = false; nextStage(); }, 1500);
+                
+                setTimeout(() => {
+                    isProcessing = false; 
+                    nextStage();
+                }, 1500);
+
             } else {
                 button.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-yellow-300');
                 button.classList.add('bg-red-700', 'dimmed', 'text-white'); 
                 feedbackEl.classList.remove('text-green-500');
                 feedbackEl.classList.add('text-red-500');
                 feedbackEl.textContent = 'INCORRECT! No points awarded.'; 
+                
                 document.querySelectorAll('#answer-options-container button').forEach(btn => {
                     if (btn.textContent === correctAnswer) {
                         btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
                         btn.classList.add('bg-green-700');
                     }
                 });
-                setTimeout(() => { isProcessing = false; nextStage(); }, 2500); 
+
+                setTimeout(() => {
+                    isProcessing = false; 
+                    nextStage();
+                }, 2500); 
             }
         }
 
+        // --- SPELLING/FREE RESPONSE LOGIC (Giữ nguyên code gốc của bạn) ---
         function renderSpelling(stageData) {
             document.getElementById('spelling-input-container').classList.remove('hidden');
             const inputEl = document.getElementById('spelling-input');
@@ -619,46 +839,59 @@
             document.getElementById('submit-spelling').disabled = false;
             document.getElementById('skip-stage-btn').disabled = false;
             inputEl.focus();
+
             if (stageData.type === 'jumble_spelling') {
                 document.getElementById('jumble-hint-display').classList.remove('hidden');
                 document.getElementById('jumble-text').textContent = stageData.jumbleHint;
                 inputEl.placeholder = "Type the missing word here..."; 
             } else if (stageData.type === 'free_response') {
+                // Use the defined free response structure guide
                 inputEl.placeholder = freeResponseGuide; 
             }
+
             isProcessing = false; 
         }
         
         function skipStage() {
             if (isProcessing) return;
             isProcessing = true;
+
             const feedbackEl = document.getElementById('feedback-message');
             feedbackEl.classList.remove('text-green-500');
             feedbackEl.classList.add('text-red-500');
             feedbackEl.textContent = 'Station Skipped! No points awarded.'; 
+            
             document.getElementById('spelling-input').disabled = true;
             document.getElementById('submit-spelling').disabled = true;
             document.getElementById('skip-stage-btn').disabled = true;
-            setTimeout(() => { isProcessing = false; nextStage(); }, 1500); 
+
+            setTimeout(() => {
+                isProcessing = false;
+                nextStage();
+            }, 1500); 
         }
 
         async function checkSpelling() {
             if (isProcessing) return;
             isProcessing = true;
+
             const inputEl = document.getElementById('spelling-input');
             let userAnswer = inputEl.value.trim(); 
             const userAnswerLower = userAnswer.toLowerCase();
             const feedbackEl = document.getElementById('feedback-message');
             const stageData = gameData[currentStage - 1];
+
             document.getElementById('submit-spelling').disabled = true;
             document.getElementById('skip-stage-btn').disabled = true;
             inputEl.disabled = true;
             feedbackEl.textContent = 'Checking...'; 
+
+
             if (stageData.type === 'jumble_spelling') {
                 const correctAnswer = stageData.word.toLowerCase().replace(/\s/g, '');
                 if (userAnswerLower.replace(/\s/g, '') === correctAnswer) {
                     score += POINTS_PER_STAGE;
-                    document.getElementById('final-score').textContent = score;
+                    if(document.getElementById('final-score')) document.getElementById('final-score').textContent = score;
                     feedbackEl.classList.remove('text-red-500');
                     feedbackEl.classList.add('text-green-500');
                     feedbackEl.textContent = `CORRECT! +${POINTS_PER_STAGE} points!`; 
@@ -667,24 +900,30 @@
                     feedbackEl.classList.remove('text-green-500');
                     feedbackEl.classList.add('text-red-500');
                     feedbackEl.textContent = `INCORRECT! The correct answer was: ${stageData.word}.`; 
+                    // Re-enable buttons to allow user to try again or skip
                     document.getElementById('submit-spelling').disabled = false;
                     document.getElementById('skip-stage-btn').disabled = false;
                     inputEl.disabled = false;
                     setTimeout(() => { isProcessing = false; }, 1000);
                 }
             } else if (stageData.type === 'free_response') {
+                // USE GEMINI FOR GRAMMAR CHECK
                 feedbackEl.textContent = 'Performing automatic grammar check...'; 
                 const grammarFeedback = await checkAndCorrectGrammar(userAnswer);
+                
                 feedbackEl.classList.remove('text-green-500', 'text-red-500');
+                
                 if (grammarFeedback.includes('CORRECT')) {
                     score += POINTS_PER_STAGE;
-                    document.getElementById('final-score').textContent = score;
+                    if(document.getElementById('final-score')) document.getElementById('final-score').textContent = score;
                     feedbackEl.classList.add('text-green-500');
                     feedbackEl.innerHTML = `🌟 ${grammarFeedback.replace('CORRECT', 'CORRECT!')} (+${POINTS_PER_STAGE} points). Quest Complete!`; 
                     setTimeout(() => { isProcessing = false; nextStage(); }, 3000);
                 } else {
                     feedbackEl.classList.add('text-red-500');
                     feedbackEl.innerHTML = `⚠️ Grammar Feedback: ${grammarFeedback}`; 
+                    
+                    // Re-enable buttons to allow user to correct and retry
                     document.getElementById('submit-spelling').disabled = false;
                     document.getElementById('skip-stage-btn').disabled = false;
                     inputEl.disabled = false;
@@ -693,14 +932,19 @@
             }
         }
 
+        // --- END GAME (Giữ nguyên code gốc của bạn) ---
         function endGame() {
             document.getElementById('question-area').classList.add('hidden');
             document.getElementById('end-screen').classList.remove('hidden');
+            
             const endTitleEl = document.getElementById('end-title');
             const endMessageEl = document.getElementById('end-message');
+            
             const displayStudentName = studentName.toUpperCase();
-            const maxScore = gameData.length * POINTS_PER_STAGE;
-            document.getElementById('final-score').textContent = score;
+            const maxScore = (gameData.length > 0 ? gameData.length : TOTAL_STAGES) * POINTS_PER_STAGE;
+
+            if(document.getElementById('final-score')) document.getElementById('final-score').textContent = score;
+
             if (score === maxScore) {
                 endTitleEl.textContent = `PERFECT! CONGRATULATIONS, ${displayStudentName}!`; 
                 endMessageEl.textContent = `You excelled in all ${maxScore/POINTS_PER_STAGE} stations and achieved a perfect score of ${score}/${maxScore}! Your knowledge is outstanding!`; 
@@ -722,7 +966,9 @@
                 document.getElementById('user-id-display').textContent = `Explorer: Anonymous`; 
             });
         };
+
     </script>
 
 </body>
 </html>
+
