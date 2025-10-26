@@ -3,7 +3,10 @@
 
 // Hàm bảo mật để gọi Gemini
 async function callGemini(apiKey, model, payload) {
-    const GEMINI_API_URL = `https://generativanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    // Thêm log để debug
+    console.log(`Calling Gemini Model: ${model}`);
     
     const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
@@ -13,7 +16,7 @@ async function callGemini(apiKey, model, payload) {
     
     if (!response.ok) {
         const errorBody = await response.text();
-        console.error("Lỗi Gemini API:", errorBody);
+        console.error(`Lỗi Gemini API (${model}):`, errorBody);
         throw new Error(`Lỗi Gemini API: ${response.status}`);
     }
     
@@ -29,16 +32,25 @@ export default async function handler(request, response) {
     // Lấy API Key BÍ MẬT từ Vercel
     const AI_API_KEY = process.env.MY_AI_KEY;
     if (!AI_API_KEY) {
+        console.error("Lỗi: Biến MY_AI_KEY chưa được cài đặt trên Vercel.");
         return response.status(500).json({ error: 'Chưa cài đặt API Key trên Vercel' });
     }
 
     try {
-        // Lấy yêu cầu từ game (loại yêu cầu là gì, và nội dung là gì)
+        // Lấy yêu cầu từ game
         const { type, payload } = request.body;
+        
+        if (!type || !payload) {
+             return response.status(400).json({ error: 'Thiếu `type` hoặc `payload` trong request' });
+        }
+        
+        console.log(`Nhận được yêu cầu loại: ${type}`);
+        
         let model;
 
         if (type === 'generate-quest') {
-            model = "gemini-1.5-flash"; // Model tạo quiz
+            // SỬA: Dùng model hỗ trợ responseSchema
+            model = "gemini-2.5-flash-preview-09-2025"; 
             const apiResponse = await callGemini(AI_API_KEY, model, payload);
             return response.status(200).json(apiResponse);
 
@@ -48,13 +60,16 @@ export default async function handler(request, response) {
             return response.status(200).json(apiResponse);
 
         } else if (type === 'generate-audio') {
-            // Lấy model name từ payload mà frontend gửi lên
-            model = payload.model; 
+            model = payload.model; // Lấy model name từ payload (ví dụ: "gemini-2.5-flash-preview-tts")
+            if (!model) {
+                 return response.status(400).json({ error: 'Thiếu `model` trong payload cho audio' });
+            }
             const apiResponse = await callGemini(AI_API_KEY, model, payload);
             return response.status(200).json(apiResponse);
 
         } else if (type === 'check-grammar') {
-            model = "gemini-1.5-flash"; // Model kiểm tra văn bản
+            // SỬA: Dùng model hỗ trợ text generation
+            model = "gemini-2.5-flash-preview-09-2025";
             const apiResponse = await callGemini(AI_API_KEY, model, payload);
             return response.status(200).json(apiResponse);
 
@@ -63,7 +78,8 @@ export default async function handler(request, response) {
         }
 
     } catch (error) {
-        console.error('Lỗi Backend:', error);
+        console.error('Lỗi Backend:', error.message);
         return response.status(500).json({ error: error.message });
     }
 }
+
