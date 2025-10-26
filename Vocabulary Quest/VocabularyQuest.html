@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Quest - Select Unit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        /* Set background to dark grey */
+        body { font-family: 'Inter', sans-serif; background-color: #282c34; color: #e6edf3; }
+        .card { background-color: #3e4451; border: 1px solid #5a606d; }
+        .shadow-gold { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
+        .unit-button {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        .unit-button:hover {
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+            transform: translateY(-2px);
+            background-color: #a04f00 !important; /* Slightly darker gold on hover */
+        }
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #FFD700;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .correct-answer {
+            animation: flash-correct 0.5s ease-out;
+        }
+        .dimmed {
+            opacity: 0.4;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        @keyframes flash-correct {
+            0% { background-color: #3e4451; transform: scale(1); }
+            50% { background-color: #16a34a; transform: scale(1.05); }
+            100% { background-color: #3e4451; transform: scale(1); }
+        }
+        .jumble-hint {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 4px;
+            font-size: 2rem;
+            color: #FFD700;
+            text-shadow: 0 0 5px #ffcc00;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Firebase SDKs (Auth only) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set log level for development
+        setLogLevel('Debug');
+
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
+        if (Object.keys(firebaseConfig).length > 0) {
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.db = getFirestore(window.firebaseApp);
+            window.auth = getAuth(window.firebaseApp);
+
+            async function authenticate() {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(window.auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(window.auth);
+                    }
+                    console.log("Firebase authentication successful.");
+                    window.userId = window.auth.currentUser?.uid || crypto.randomUUID();
+                    document.dispatchEvent(new Event('authReady'));
+                } catch (error) {
+                    console.error("Firebase authentication error:", error);
+                    window.userId = crypto.randomUUID();
+                    document.dispatchEvent(new Event('authReady'));
+                }
+            }
+            authenticate();
+        } else {
+            console.warn("Firebase configuration not found.");
+            window.userId = crypto.randomUUID();
+            document.dispatchEvent(new Event('authReady'));
+        }
+    </script>
+    
+    <!-- Main Game Container -->
+    <div id="game-container" class="w-full max-w-4xl card p-6 rounded-xl shadow-gold text-white">
+        <h1 class="text-3xl font-black text-center text-yellow-400 mb-6 uppercase tracking-wider">
+            🗺️ ENGLISH VOCABULARY QUEST (UNITS 1-10)
+        </h1>
+
+        <!-- User/Status Info -->
+        <div class="flex justify-between items-center mb-4 text-sm font-semibold text-gray-400">
+            <span id="user-id-display" class="bg-gray-700 p-2 rounded-lg truncate w-full"> 
+                Explorer: Anonymous
+            </span>
+        </div>
+
+        <!-- Progress Bar & Stage Display -->
+        <div class="mb-6">
+            <div id="progress-bar-container" class="w-full bg-gray-700 rounded-full h-4 mb-2">
+                <div id="progress-bar" class="bg-yellow-500 h-4 rounded-full transition-all duration-500" style="width: 0%;"></div>
+            </div>
+            <p id="stage-display" class="text-center text-yellow-400 font-bold">Station 0 / 10: Getting Ready</p>
+        </div>
+
+        <!-- Start/Selection Screen -->
+        <div id="start-screen" class="text-center">
+            <img src="https://placehold.co/800x200/5a606d/ffffff?text=SELECT+YOUR+UNIT" alt="Textbook Map" class="w-full h-32 object-cover rounded-lg mb-6 opacity-80" />
+            
+            <div id="start-content">
+                <p class="text-lg mb-6 text-gray-300">
+                    Select a Unit (1-10) to start your quest! The AI will generate 10 random questions based on the vocabulary and grammar of that lesson. (Max Score: 100 points)
+                </p>
+    
+                <!-- Name Input Field -->
+                <div class="mb-8">
+                    <label for="student-name" class="text-lg text-yellow-300 font-semibold block mb-2">Enter Your Name (Optional):</label>
+                    <input type="text" id="student-name" placeholder="Explorer's Name" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-yellow-500 focus:border-yellow-500 text-center text-lg" maxlength="25">
+                </div>
+
+                <!-- Unit Selection Grid -->
+                <div id="unit-selection-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(1)">Unit 1</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(2)">Unit 2</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(3)">Unit 3</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(4)">Unit 4</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(5)">Unit 5</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(6)">Unit 6</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(7)">Unit 7</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(8)">Unit 8</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(9)">Unit 9</button>
+                    <button class="unit-button bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg shadow-lg" onclick="selectUnit(10)">Unit 10</button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="generation-loading" class="hidden flex flex-col items-center justify-center p-10">
+                <div class="loading-animation mb-4 w-12 h-12"></div>
+                <p class="text-xl font-semibold text-yellow-400">AI is generating your unique quest...</p>
+                <p class="text-sm text-gray-400 mt-2">This may take 10-15 seconds. Please wait!</p>
+            </div>
+        </div>
+
+        <!-- Game Question Area -->
+        <div id="question-area" class="hidden">
+            <!-- Image Clue Area -->
+            <div id="image-clue-container" class="flex justify-center items-center h-48 w-full card rounded-lg mb-6 p-4">
+                <div id="image-loading" class="hidden flex flex-col items-center">
+                    <div class="loading-animation mb-2"></div>
+                    <p class="text-yellow-400 font-semibold">Drawing Hint...</p>
+                </div>
+                <img id="image-clue" src="" alt="AI Hint Image" class="w-full h-full object-contain rounded-lg hidden border-2 border-yellow-500" />
+            </div>
+
+            <!-- Audio Clue Area -->
+            <div id="audio-clue-container" class="hidden flex flex-col items-center justify-center card rounded-lg mb-6 p-4">
+                <p id="audio-prompt-text" class="text-center text-xl font-medium mb-4 text-yellow-300">Listen to the English sentence:</p>
+                <div id="audio-controls" class="flex items-center space-x-4">
+                    <button id="play-audio-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition duration-300 disabled:opacity-50 flex items-center" onclick="playAudio()">
+                        <svg id="play-icon" class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.152A1 1 0 008 8v4a1 1 0 001.555.848l3.667-2A1 1 0 0013 10a1 1 0 00-.778-.848l-3.667-2z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+                        <div id="audio-loading-spinner" class="loading-animation w-6 h-6 mr-2 hidden"></div>
+                        <span>Play Audio</span>
+                    </button>
+                    <audio id="audio-player" class="hidden"></audio>
+                </div>
+            </div>
+
+            <!-- Question/Prompt -->
+            <h2 id="question-prompt" class="text-xl font-bold text-center mb-4 text-yellow-300"></h2>
+            
+            <!-- Jumble Hint Display -->
+            <div id="jumble-hint-display" class="hidden text-center mb-6">
+                <p class="text-lg text-gray-400 mb-2">Jumble Hint:</p>
+                <p id="jumble-text" class="jumble-hint"></p>
+            </div>
+
+            <!-- Answer Area (Multiple Choice) -->
+            <div id="answer-options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Buttons will be inserted here -->
+            </div>
+
+            <!-- Spelling Input Area -->
+            <div id="spelling-input-container" class="hidden flex flex-col items-center">
+                <input type="text" id="spelling-input" placeholder="Type your English answer here..." class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-yellow-500 focus:border-yellow-500 text-center text-lg" />
+                
+                <div class="flex space-x-4 mt-4 w-full justify-center">
+                    <button id="submit-spelling" class="flex-1 bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 px-8 rounded-lg transition duration-300 text-lg uppercase" onclick="checkSpelling()">
+                        CONFIRM ANSWER
+                    </button>
+                    <!-- SKIP BUTTON -->
+                    <button id="skip-stage-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-lg transition duration-300 text-lg uppercase" onclick="skipStage()">
+                        SKIP STATION
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Message -->
+            <p id="feedback-message" class="text-center mt-4 text-lg font-semibold h-6"></p>
+        </div>
+
+        <!-- End Screen -->
+        <div id="end-screen" class="hidden text-center">
+            <h2 id="end-title" class="text-4xl font-black mb-4 text-green-400 uppercase"></h2>
+            <p id="end-message" class="text-xl mb-6 text-gray-300"></p>
+            <p class="text-2xl font-bold text-yellow-300 mb-8">Total Score: <span id="final-score" class="text-4xl text-yellow-400">0</span> / 100</p>
+            <button class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 px-8 rounded-lg shadow-lg transition duration-300 text-xl uppercase tracking-wider" onclick="window.location.reload()">
+                PLAY AGAIN
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- GLOBAL VARIABLES & DATA ---
+        let currentUnit = 0;
+        let currentStage = 0;
+        let score = 0;
+        let isProcessing = false;
+        let studentName = "Anonymous";
+        let freeResponseGuide = ""; 
+        let gameData = [];
+        const TOTAL_STAGES = 10;
+        const POINTS_PER_STAGE = 10;
+
+        // API Key (Placeholder - will be populated by the environment)
+        const apiKey = ""; 
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+        
+        // --- UNIT CONSTRAINTS & THEMES (Keep English content, only translate explanatory comments) ---
+        function getUnitConstraints(unit) {
+            let theme = '';
+            let grammarExample = '';
+            let freeResponseQuestion = '';
+            let freeResponseStructure = '';
+
+            switch (unit) {
+                case 1:
+                    theme = "Personal information (e.g., city, names, favorite school subjects)";
+                    grammarExample = "Use prepositions of place (in, on, at) and the structure 'What's your favourite...?'";
+                    freeResponseQuestion = "What is your favourite subject at school?";
+                    freeResponseStructure = "The structure 'My favourite subject is...' or 'I like [subject]'.";
+                    break;
+                case 2:
+                    theme = "Housing (e.g., building, flat, house, tower, numbers 1-100)";
+                    grammarExample = "Structure 'Do you live in this/that...' and 'Is it a...?'";
+                    freeResponseQuestion = "Describe your house or apartment. What is it like?";
+                    freeResponseStructure = "Use descriptive adjectives and vocabulary about homes (e.g., big, small, house, flat).";
+                    break;
+                case 3:
+                    theme = "Foreign friends (e.g., American, active, clever, friendly, helpful)";
+                    grammarExample = "Structure 'What nationality is he/she?' and 'What's he/she like?' (personality)";
+                    freeResponseQuestion = "Describe your best friend's personality using 3 adjectives.";
+                    freeResponseStructure = "Use the structure 'He/She is...' with personality adjectives.";
+                    break;
+                case 4:
+                    theme = "Leisure activities (e.g., go for a walk, play the violin, surf the Internet, water the flowers)";
+                    grammarExample = "Structure 'I like V-ing' and Adverbs of Frequency (always, often, sometimes, usually)";
+                    freeResponseQuestion = "What do you like doing in your free time?";
+                    freeResponseStructure = "Use the structure: 'I like V-ing...'";
+                    break;
+                case 5:
+                    theme = "Future jobs (e.g., firefighter, gardener, reporter, writer, grow flowers, report the news, teach children)";
+                    grammarExample = "Structure 'What would you like to be in the future?' and 'I'd like to be a... because...'";
+                    freeResponseQuestion = "What job would you like to have in the future and why?";
+                    freeResponseStructure = "Use the structure: 'I'd like to be a... because I like to...'";
+                    break;
+                case 6:
+                    theme = "Classrooms and Directions (e.g., first floor, second floor, third floor, upstairs, downstairs, go up, go down)";
+                    grammarExample = "Structure 'Where's the...?' and 'It's on the...' (location, floor)";
+                    freeResponseQuestion = "Describe how to get to your favourite room at school (e.g., classroom, library).";
+                    freeResponseStructure = "Use directional words and floor descriptions (e.g., first floor, go upstairs).";
+                    break;
+                case 7:
+                    theme = "Favorite school activities (e.g., solving games, read books, solve maths problems, work in a group, useful)";
+                    grammarExample = "Structure 'What school activity does he/she like?' and 'He/She likes...'";
+                    freeResponseQuestion = "What school activity is your favorite, and what makes it fun?";
+                    freeResponseStructure = "Use the structure 'I like V-ing...' and give a reason using 'because'.";
+                    break;
+                case 8:
+                    theme = "Classroom objects and Prepositions (e.g., above, beside, in front of, under, crayon, glue stick, pencil sharpener, set square)";
+                    grammarExample = "Structure 'Where are the...?' (plural) and 'They're...' (prepositions: above, beside, under)";
+                    freeResponseQuestion = "Describe the location of three things on your desk using prepositions.";
+                    freeResponseStructure = "Use the structure: 'The [thing] is [preposition] the [other thing].'";
+                    break;
+                case 9:
+                    theme = "Past outdoor activities (e.g., aquarium, campsite, cinema, faire, dance around the campfire, listen to music, play chess, watch the fish)";
+                    grammarExample = "Structure 'Were you at the... yesterday?' and answers 'Yes, we were / No, we weren't.'";
+                    freeResponseQuestion = "What outdoor activity did you do last weekend?";
+                    freeResponseStructure = "Use the Past Simple tense form (e.g., I went to the cinema, I watched a movie).";
+                    break;
+                case 10:
+                    theme = "School trip activities (e.g., Ba Na Hills, Bai Dinh Pagoda, Hoan Kiem Lake, Suoi Tien, visit the old buildings, walk around the lake)";
+                    grammarExample = "Structure 'Did they go to...?' and answers 'Yes, they did / No, they didn't.' (Past Simple Questions)";
+                    freeResponseQuestion = "Describe one thing you did on your last school trip.";
+                    freeResponseStructure = "Use the Past Simple tense (e.g., I visited..., We saw...).";
+                    break;
+                default:
+                    return null;
+            }
+
+            const systemPrompt = `You are an English vocabulary quiz generator for middle school students. Generate 10 diverse quiz stations in the exact JSON format provided. The content MUST STRICTLY use vocabulary and grammar rules from Unit ${unit}: ${theme}. All 'questionText' MUST be in English. The final station (Station 10) MUST be a 'free_response' question about ${freeResponseQuestion} requiring the student to use the structure: ${freeResponseStructure}.`;
+
+            const userQuery = `Generate 10 unique quiz stations about ${theme} based ONLY on Unit ${unit} content, ensuring a variety of question types are represented and the last one is a free response question: '${freeResponseQuestion}'. The total score is 100 points.`;
+            
+            // Instruction for the free response input box
+            const freeResponsePlaceholder = `Answer in English, using the structure: ${freeResponseStructure.replace('e.g.,', 'E.g.:').replace('[thing] is [preposition] the [other thing].', '[thing] is [preposition] the [other thing].')}`;
+
+            return { systemPrompt, userQuery, freeResponsePlaceholder };
+        }
+        
+
+        // --- FIREBASE / UTILITY FUNCTIONS (unchanged) ---
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error! status: ${response.status}`);
+                    }
+                    return response.json();
+                } catch (error) {
+                    console.error(`Fetch attempt ${i + 1} failed:`, error);
+                    if (i === maxRetries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+        
+        // TTS Utility functions
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function pcmToWav(pcm16, sampleRate = 16000) {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        
+        // Image generation function
+        async function generateImage(prompt) {
+            const container = document.getElementById('image-clue-container');
+            const imageEl = document.getElementById('image-clue');
+            const loadingEl = document.getElementById('image-loading');
+
+            imageEl.src = "";
+            imageEl.classList.add('hidden');
+            loadingEl.classList.remove('hidden');
+            container.classList.remove('shadow-gold');
+
+            const fullPrompt = `a whimsical, mysterious, stylized drawing of a ${prompt} for a kids' vocabulary quest game. High quality, friendly cartoon style.`;
+            
+            const modelName = "gemini-2.5-flash-image-preview";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: fullPrompt }] }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+            };
+
+            try {
+                const result = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                // Update Base64 data access
+                const candidate = result?.candidates?.[0];
+                const imagePart = candidate?.content?.parts?.find(p => p.inlineData && p.inlineData.mimeType.startsWith('image/'));
+                const base64Data = imagePart?.inlineData?.data;
+
+                if (base64Data) {
+                    const imageUrl = `data:image/png;base64,${base64Data}`;
+                    imageEl.src = imageUrl;
+                    imageEl.classList.remove('hidden');
+                    container.classList.add('shadow-gold');
+                } else {
+                    console.error("AI Image Generation Error: Base64 data not found.", result);
+                    throw new Error("Could not generate image from AI.");
+                }
+            } catch (error) {
+                console.error("Image API call error:", error);
+                imageEl.src = `https://placehold.co/400x200/5a606d/ffffff?text=ERROR+LOADING+IMAGE`;
+                imageEl.classList.remove('hidden');
+            } finally {
+                loadingEl.classList.add('hidden');
+                isProcessing = false; 
+            }
+        }
+        
+        // Audio generation function
+        async function generateAudio(prompt, voiceName) {
+            const btn = document.getElementById('play-audio-btn');
+            const spinner = document.getElementById('audio-loading-spinner');
+            const audioPlayer = document.getElementById('audio-player');
+            const feedbackEl = document.getElementById('feedback-message');
+
+            audioPlayer.src = "";
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            document.getElementById('play-icon').classList.add('hidden');
+            feedbackEl.textContent = 'Generating Audio...'; 
+
+            const modelName = "gemini-2.5-flash-preview-tts";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    // Use 'Kore' or 'Puck' for a clear, friendly voice
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName || "Kore" } } } 
+                },
+                model: modelName
+            };
+
+            try {
+                const result = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000;
+                    
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    audioPlayer.src = audioUrl;
+                    feedbackEl.textContent = 'Audio ready! Press Play.'; 
+                } else {
+                    throw new Error("Invalid or missing audio data from TTS API.");
+                }
+            } catch (error) {
+                console.error("TTS API call error:", error);
+                feedbackEl.textContent = 'Error loading Audio. Please try again.'; 
+            } finally {
+                spinner.classList.add('hidden');
+                document.getElementById('play-icon').classList.remove('hidden');
+                btn.disabled = false;
+                isProcessing = false;
+            }
+        }
+        
+        function playAudio() {
+             const audioPlayer = document.getElementById('audio-player');
+             if (audioPlayer.src) {
+                audioPlayer.play().catch(e => console.error("Audio Playback Error:", e));
+             } else {
+                document.getElementById('feedback-message').textContent = 'Audio not loaded yet. Please wait.'; 
+             }
+        }
+        
+        // --- API INTEGRATION: DYNAMIC QUIZ GENERATION & GRAMMAR CHECK ---
+
+        const quizSchema = {
+            type: "ARRAY",
+            description: "An array of 10 diverse quiz stations for an English vocabulary game strictly adhering to the specified Unit's content. All questions must be in English. The final question must be a 'free_response' type.",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    id: { type: "INTEGER", description: "Sequential station number (1 to 10)." },
+                    type: { type: "STRING", enum: ["image_mc", "audio_mc", "sentence_mc", "jumble_spelling", "grammar_mc", "free_response"], description: "Type of challenge. Ensure diversity across the 10 items. The last station MUST be 'free_response'." },
+                    word: { type: "STRING", description: "The single correct answer word or phrase." },
+                    prompt: { type: "STRING", description: "The prompt for image generation (must be English) or general context. Must be related to the Unit's vocabulary." },
+                    options: { type: "ARRAY", items: { type: "STRING" }, description: "4 options for multiple choice questions. MUST include the correct 'word' and 3 plausible incorrect options. Only for *_mc types." },
+                    questionText: { type: "STRING", description: "The user-facing question text in English." },
+                    audioPrompt: { type: "STRING", description: "A simple English sentence using the Unit's grammar for TTS. Only for audio_mc type." },
+                    jumbleHint: { type: "STRING", description: "A visual hint for the jumble word (e.g., s _ _ _ t _ _ _ _ _ s). Only for jumble_spelling type." }
+                },
+                required: ["id", "type", "word", "questionText"]
+            }
+        };
+
+        async function generateNewGameData(unit) {
+            const loadingEl = document.getElementById('generation-loading');
+            const startContentEl = document.getElementById('start-content');
+            loadingEl.classList.remove('hidden');
+            startContentEl.classList.add('hidden');
+            
+            const constraints = getUnitConstraints(unit);
+            
+            if (!constraints) {
+                alert("Error: Constraints for this Unit not found. Please reload."); 
+                return false;
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: constraints.userQuery }] }],
+                systemInstruction: { parts: [{ text: constraints.systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: quizSchema
+                }
+            };
+
+            try {
+                const response = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) throw new Error("API response content is empty."); 
+
+                const generatedData = JSON.parse(jsonText);
+                
+                // Simple validation
+                if (Array.isArray(generatedData) && generatedData.length === TOTAL_STAGES) {
+                    gameData = generatedData;
+                    console.log(`Successfully generated game data for Unit ${unit}:`, gameData); 
+                    return true;
+                } else {
+                    throw new Error("Generated data count is incorrect or invalid."); 
+                }
+
+            } catch (error) {
+                console.error("Quiz Generation Failed:", error); 
+                alert(`Quiz Generation for Unit ${unit} failed. Please try again.`); 
+                return false;
+            } finally {
+                loadingEl.classList.add('hidden');
+                startContentEl.classList.remove('hidden');
+            }
+        }
+        
+        // New function to check and correct grammar using Gemini
+        async function checkAndCorrectGrammar(userAnswer) {
+            const modelName = "gemini-2.5-flash-preview-09-2025";
+            const apiUrl = `${GEMINI_API_URL}?key=${apiKey}`;
+            
+            // Get required grammar structure for the response
+            const constraints = getUnitConstraints(currentUnit);
+            const requiredStructure = constraints.freeResponseStructure;
+            const freeResponseQuestion = constraints.freeResponseQuestion;
+            
+            const systemPrompt = `You are a friendly English tutor. Your task is to evaluate the student's answer to the question '${freeResponseQuestion}'. The student MUST use the required structure: ${requiredStructure}. Analyze the user's input. If it is grammatically correct and uses the required structure, respond ONLY with the word: 'CORRECT'. If it is incorrect or doesn't follow the required structure, provide a brief, polite correction in English, explaining the correct rule (e.g., 'like + V-ing' or 'Past Simple') and suggesting a corrected sentence.`;
+
+            const userQuery = `Student's answer: "${userAnswer}". Please check and provide feedback.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const result = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const feedback = result?.candidates?.[0]?.content?.parts?.[0]?.text || "No response received. Please try again."; 
+                return feedback.trim();
+                
+            } catch (error) {
+                console.error("Grammar check failed:", error); 
+                return "Automatic grammar check error. Please contact your teacher."; 
+            }
+        }
+
+
+        // --- GAME LOGIC ---
+        
+        function selectUnit(unit) {
+            if (isProcessing) return;
+            currentUnit = unit;
+            // Highlight the selected button
+            document.querySelectorAll('.unit-button').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'shadow-gold');
+                if (parseInt(btn.textContent.replace('Unit ', '')) === unit) {
+                    btn.classList.add('bg-blue-600', 'shadow-gold');
+                }
+            });
+
+            // Update player name and start generation process
+            const nameInput = document.getElementById('student-name').value.trim();
+            studentName = nameInput || "Anonymous";
+
+            // Get the free response structure guide
+            const constraints = getUnitConstraints(unit);
+            freeResponseGuide = constraints.freeResponsePlaceholder;
+
+            startGame(unit);
+        }
+
+
+        function updateProgress() {
+            const actualTotalStages = gameData.length || TOTAL_STAGES;
+            const percent = (currentStage / actualTotalStages) * 100;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            
+            let stageName = 'Vocabulary Challenge'; 
+            if (currentStage === actualTotalStages) {
+                 stageName = 'Treasure Chest!'; 
+            } else if (currentStage > actualTotalStages) {
+                stageName = 'Completed'; 
+            } else if (currentStage === 0) {
+                 stageName = 'Getting Ready'; 
+            }
+            document.getElementById('stage-display').textContent = `Station ${currentStage} / ${actualTotalStages}: ${stageName}`; 
+            document.querySelector('#end-screen .mb-8').innerHTML = `Total Score: <span id="final-score" class="text-4xl text-yellow-400">0</span> / ${actualTotalStages * POINTS_PER_STAGE}`; 
+        }
+
+        async function startGame(unit) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            document.getElementById('user-id-display').textContent = `Explorer: ${studentName} (Unit ${unit})`; 
+
+            // Start game data generation
+            const success = await generateNewGameData(unit);
+            if (!success) {
+                isProcessing = false;
+                return; // Stop if data generation failed
+            }
+
+            currentStage = 0;
+            score = 0;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('question-area').classList.remove('hidden');
+            
+            document.getElementById('final-score').textContent = score;
+
+            isProcessing = false;
+            nextStage();
+        }
+
+        function nextStage() {
+            currentStage++;
+            updateProgress();
+            
+            document.getElementById('feedback-message').textContent = '';
+            document.getElementById('spelling-input').value = '';
+            document.getElementById('feedback-message').classList.remove('text-red-500', 'text-green-500');
+
+
+            const actualTotalStages = gameData.length;
+            if (currentStage > actualTotalStages) {
+                endGame();
+                return;
+            }
+
+            const stageData = gameData[currentStage - 1];
+            
+            // Hide all clue/input areas before showing the new one
+            document.getElementById('image-clue-container').classList.add('hidden');
+            document.getElementById('image-clue').classList.add('hidden');
+            document.getElementById('image-loading').classList.add('hidden');
+            document.getElementById('audio-clue-container').classList.add('hidden');
+            document.getElementById('jumble-hint-display').classList.add('hidden');
+            document.getElementById('answer-options-container').classList.add('hidden');
+            document.getElementById('spelling-input-container').classList.add('hidden');
+
+            document.getElementById('question-prompt').textContent = stageData.questionText;
+
+            if (stageData.type.includes('_mc')) {
+                renderMultipleChoice(stageData);
+            } else if (stageData.type === 'jumble_spelling' || stageData.type === 'free_response') {
+                renderSpelling(stageData);
+            }
+            
+            // Display necessary clues (Image/Audio)
+            if (stageData.type === 'image_mc' || stageData.type === 'free_response') {
+                document.getElementById('image-clue-container').classList.remove('hidden');
+                isProcessing = true;
+                generateImage(stageData.prompt);
+            } else if (stageData.type === 'audio_mc') {
+                document.getElementById('audio-clue-container').classList.remove('hidden');
+                isProcessing = true;
+                generateAudio(stageData.audioPrompt, "Kore"); // Default voice Kore
+            }
+        }
+
+        // --- MULTIPLE CHOICE LOGIC ---
+        function renderMultipleChoice(stageData) {
+            const optionsContainer = document.getElementById('answer-options-container');
+            optionsContainer.classList.remove('hidden');
+            optionsContainer.innerHTML = '';
+
+            // Ensure buttons are re-enabled
+            document.querySelectorAll('#answer-options-container button').forEach(btn => btn.disabled = false);
+
+            const shuffledOptions = [...stageData.options].sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = 'bg-gray-700 hover:bg-gray-600 text-yellow-300 font-bold py-3 px-4 rounded-lg transition duration-200 uppercase text-lg text-left px-5';
+                button.onclick = () => checkAnswer(option, stageData.word, button);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function checkAnswer(selectedOption, correctAnswer, button) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            const feedbackEl = document.getElementById('feedback-message');
+            document.querySelectorAll('#answer-options-container button').forEach(btn => btn.disabled = true);
+
+            if (selectedOption === correctAnswer) {
+                score += POINTS_PER_STAGE;
+                document.getElementById('final-score').textContent = score;
+                
+                button.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                button.classList.add('correct-answer', 'bg-green-700');
+                feedbackEl.classList.remove('text-red-500');
+                feedbackEl.classList.add('text-green-500');
+                feedbackEl.textContent = `CORRECT! +${POINTS_PER_STAGE} points!`; 
+                
+                setTimeout(() => {
+                    isProcessing = false; 
+                    nextStage();
+                }, 1500);
+
+            } else {
+                button.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-yellow-300');
+                button.classList.add('bg-red-700', 'dimmed', 'text-white'); 
+                feedbackEl.classList.remove('text-green-500');
+                feedbackEl.classList.add('text-red-500');
+                feedbackEl.textContent = 'INCORRECT! No points awarded.'; 
+                
+                document.querySelectorAll('#answer-options-container button').forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                        btn.classList.add('bg-green-700');
+                    }
+                });
+
+                setTimeout(() => {
+                    isProcessing = false; 
+                    nextStage();
+                }, 2500); 
+            }
+        }
+
+        // --- SPELLING/FREE RESPONSE LOGIC ---
+        function renderSpelling(stageData) {
+            document.getElementById('spelling-input-container').classList.remove('hidden');
+            const inputEl = document.getElementById('spelling-input');
+            inputEl.disabled = false;
+            document.getElementById('submit-spelling').disabled = false;
+            document.getElementById('skip-stage-btn').disabled = false;
+            inputEl.focus();
+
+            if (stageData.type === 'jumble_spelling') {
+                document.getElementById('jumble-hint-display').classList.remove('hidden');
+                document.getElementById('jumble-text').textContent = stageData.jumbleHint;
+                inputEl.placeholder = "Type the missing word here..."; 
+            } else if (stageData.type === 'free_response') {
+                // Use the defined free response structure guide
+                inputEl.placeholder = freeResponseGuide; 
+            }
+
+            isProcessing = false; 
+        }
+        
+        function skipStage() {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            const feedbackEl = document.getElementById('feedback-message');
+            feedbackEl.classList.remove('text-green-500');
+            feedbackEl.classList.add('text-red-500');
+            feedbackEl.textContent = 'Station Skipped! No points awarded.'; 
+            
+            document.getElementById('spelling-input').disabled = true;
+            document.getElementById('submit-spelling').disabled = true;
+            document.getElementById('skip-stage-btn').disabled = true;
+
+            setTimeout(() => {
+                isProcessing = false;
+                nextStage();
+            }, 1500); 
+        }
+
+        async function checkSpelling() {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            const inputEl = document.getElementById('spelling-input');
+            let userAnswer = inputEl.value.trim(); 
+            const userAnswerLower = userAnswer.toLowerCase();
+            const feedbackEl = document.getElementById('feedback-message');
+            const stageData = gameData[currentStage - 1];
+
+            document.getElementById('submit-spelling').disabled = true;
+            document.getElementById('skip-stage-btn').disabled = true;
+            inputEl.disabled = true;
+            feedbackEl.textContent = 'Checking...'; 
+
+
+            if (stageData.type === 'jumble_spelling') {
+                const correctAnswer = stageData.word.toLowerCase().replace(/\s/g, '');
+                if (userAnswerLower.replace(/\s/g, '') === correctAnswer) {
+                    score += POINTS_PER_STAGE;
+                    document.getElementById('final-score').textContent = score;
+                    feedbackEl.classList.remove('text-red-500');
+                    feedbackEl.classList.add('text-green-500');
+                    feedbackEl.textContent = `CORRECT! +${POINTS_PER_STAGE} points!`; 
+                    setTimeout(() => { isProcessing = false; nextStage(); }, 2000);
+                } else {
+                    feedbackEl.classList.remove('text-green-500');
+                    feedbackEl.classList.add('text-red-500');
+                    feedbackEl.textContent = `INCORRECT! The correct answer was: ${stageData.word}.`; 
+                    // Re-enable buttons to allow user to try again or skip
+                    document.getElementById('submit-spelling').disabled = false;
+                    document.getElementById('skip-stage-btn').disabled = false;
+                    inputEl.disabled = false;
+                    setTimeout(() => { isProcessing = false; }, 1000);
+                }
+            } else if (stageData.type === 'free_response') {
+                // USE GEMINI FOR GRAMMAR CHECK
+                feedbackEl.textContent = 'Performing automatic grammar check...'; 
+                const grammarFeedback = await checkAndCorrectGrammar(userAnswer);
+                
+                feedbackEl.classList.remove('text-green-500', 'text-red-500');
+                
+                if (grammarFeedback.includes('CORRECT')) {
+                    score += POINTS_PER_STAGE;
+                    document.getElementById('final-score').textContent = score;
+                    feedbackEl.classList.add('text-green-500');
+                    feedbackEl.innerHTML = `🌟 ${grammarFeedback.replace('CORRECT', 'CORRECT!')} (+${POINTS_PER_STAGE} points). Quest Complete!`; 
+                    setTimeout(() => { isProcessing = false; nextStage(); }, 3000);
+                } else {
+                    feedbackEl.classList.add('text-red-500');
+                    feedbackEl.innerHTML = `⚠️ Grammar Feedback: ${grammarFeedback}`; 
+                    
+                    // Re-enable buttons to allow user to correct and retry
+                    document.getElementById('submit-spelling').disabled = false;
+                    document.getElementById('skip-stage-btn').disabled = false;
+                    inputEl.disabled = false;
+                    setTimeout(() => { isProcessing = false; }, 1000);
+                }
+            }
+        }
+
+        // --- END GAME ---
+        function endGame() {
+            document.getElementById('question-area').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            
+            const endTitleEl = document.getElementById('end-title');
+            const endMessageEl = document.getElementById('end-message');
+            
+            const displayStudentName = studentName.toUpperCase();
+            const maxScore = gameData.length * POINTS_PER_STAGE;
+
+            document.getElementById('final-score').textContent = score;
+
+            if (score === maxScore) {
+                endTitleEl.textContent = `PERFECT! CONGRATULATIONS, ${displayStudentName}!`; 
+                endMessageEl.textContent = `You excelled in all ${maxScore/POINTS_PER_STAGE} stations and achieved a perfect score of ${score}/${maxScore}! Your knowledge is outstanding!`; 
+            }
+            else if (score >= maxScore * 0.7) {
+                endTitleEl.textContent = `GREAT JOB, ${displayStudentName}!`; 
+                endMessageEl.textContent = `You completed the quest with a score of ${score}/${maxScore}! Keep practicing to reach the max score!`; 
+            } 
+            else {
+                endTitleEl.textContent = `QUEST COMPLETED, ${displayStudentName}!`; 
+                endMessageEl.textContent = `You finished the adventure with ${score}/${maxScore} points. Try playing again to conquer ${maxScore} points!`; 
+            }
+            isProcessing = false;
+        }
+
+        // Initialization
+        window.onload = function() {
+            document.addEventListener('authReady', () => {
+                document.getElementById('user-id-display').textContent = `Explorer: Anonymous`; 
+            });
+        };
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Quest</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main>
+        <h1>🗺️ Vocabulary Quest 🗺️</h1>
+        <p>Hãy nhập chủ đề từ vựng (ví dụ: animals, school supplies,...) để bắt đầu cuộc săn tìm!</p>
+
+        <div class="controls">
+            <input type="text" id="topic-input" placeholder="Nhập chủ đề ở đây...">
+            <button id="generate-btn">Bắt đầu Quest!</button>
+        </div>
+
+        <div id="loading" style="display: none;">
+            <div class="spinner"></div>
+            Đang tạo thử thách, vui lòng chờ...
+        </div>
+
+        <div id="quest-display">
+            </div>
+    </main>
+
+    <script src="game.js"></script>
+</body>
+</html>
